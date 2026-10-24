@@ -23,10 +23,77 @@ function normalizeVm(raw) {
     // The requested canonical VM URL, not arbitrary server-provided schemes.
     url: "https://" + name + ".exe.xyz/",
     status: String(raw.status || "unknown"),
+    cpus: metadataNumber(raw.allocated_cpus),
+    memoryBytes: metadataNumber(raw.memory_capacity_bytes),
+    diskBytes: metadataNumber(raw.disk_capacity_bytes),
+    region: typeof raw.region === "string" ? raw.region : "",
+    regionDisplay: typeof raw.region_display === "string" ? raw.region_display : "",
+    image: typeof raw.image === "string" ? raw.image : "",
+    createdAt: typeof raw.created_at === "string" ? raw.created_at : "",
+    proxyPort: Number.isInteger(raw.proxy_port) && raw.proxy_port > 0 && raw.proxy_port <= 65535 ? raw.proxy_port : 0,
+    egressPolicy: typeof raw.egress_policy === "string" ? raw.egress_policy : "",
+    emailReceiveEnabled: typeof raw.email_receive_enabled === "boolean" ? raw.email_receive_enabled : null,
     publicWeb: raw.proxy_share === "public" || !!(raw.sharing && raw.sharing.public_proxy),
+    adminAllowed: !!(raw.access && raw.access.admin === true),
     shellAllowed: !(raw.access && raw.access.shell === false),
     webAllowed: !(raw.access && raw.access.web === false)
   };
+}
+
+// Optional display metadata must not invent resource values when absent.
+function metadataNumber(value) {
+  return typeof value === "number" && isFinite(value) && value > 0 ? value : 0;
+}
+
+function formatBytes(bytes) {
+  if (!metadataNumber(bytes)) return "";
+  var units = ["B", "KiB", "MiB", "GiB", "TiB"];
+  var unit = 0;
+  while (bytes >= 1024 && unit < units.length - 1) { bytes /= 1024; unit++; }
+  return Math.round(bytes * 10) / 10 + " " + units[unit];
+}
+
+function resourceSummary(vm) {
+  if (!vm) return "";
+  var parts = [];
+  if (vm.cpus) parts.push(vm.cpus + (vm.cpus === 1 ? " vCPU" : " vCPUs"));
+  if (vm.memoryBytes) parts.push(formatBytes(vm.memoryBytes) + " RAM");
+  if (vm.diskBytes) parts.push(formatBytes(vm.diskBytes) + " disk");
+  return parts.join(" · ");
+}
+
+function networkSummary(vm) {
+  if (!vm) return "";
+  var parts = [];
+  if (vm.proxyPort) parts.push("Port " + vm.proxyPort);
+  parts.push(vm.publicWeb ? "Public web" : "Private web");
+  if (vm.egressPolicy)
+    parts.push("Egress: " + (vm.egressPolicy === "all" ? "all destinations" : vm.egressPolicy === "integrations" ? "integrations only" : vm.egressPolicy));
+  return parts.join(" · ");
+}
+
+function createdAgo(createdAt, now) {
+  if (!createdAt) return "";
+  var timestamp = Date.parse(createdAt);
+  if (!isFinite(timestamp)) return "";
+  if (typeof now !== "number" || !isFinite(now)) now = Date.now();
+  var seconds = Math.max(0, (now - timestamp) / 1000);
+  if (seconds < 60) return "Created just now";
+  var count, unit;
+  if (seconds < 3600) { count = Math.floor(seconds / 60); unit = "minute"; }
+  else if (seconds < 86400) { count = Math.floor(seconds / 3600); unit = "hour"; }
+  else { count = Math.floor(seconds / 86400); unit = "day"; }
+  return "Created " + count + " " + unit + (count === 1 ? "" : "s") + " ago";
+}
+
+function detailFacts(vm) {
+  if (!vm) return [];
+  var facts = [];
+  if (vm.region || vm.regionDisplay)
+    facts.push({label: "Region", value: vm.region ? vm.region.toUpperCase() : vm.regionDisplay, tooltip: vm.regionDisplay || ""});
+  if (typeof vm.emailReceiveEnabled === "boolean")
+    facts.push({label: "Email", value: vm.emailReceiveEnabled ? "Receive on" : "Receive off"});
+  return facts;
 }
 
 function parseVms(text) {
@@ -121,6 +188,41 @@ function sshCommand(vm) {
   // Validate again at the action boundary; no shell evaluates any VM metadata.
   var safe = normalizeVm({vm_name: vm.name, ssh_dest: vm.sshDest});
   return ["omarchy-launch-terminal", "ssh", "--", safe.sshDest];
+}
+
+// Fixed command/host and validated arguments only: SSH joins remote arguments
+// into a command string, so never pass arbitrary metadata or an arbitrary verb.
+function managementFailure(exitCode, detail, exitStatus) {
+  // QProcess::NormalExit is 0; CrashExit carries the raw signal number as
+  // exitCode, not necessarily the shell-style 128 + signal encoding.
+  var crashed = exitStatus !== undefined && exitStatus !== 0;
+  var uncertain = crashed || exitCode === 124 || exitCode >= 128 || exitCode < 0;
+  var message = "";
+  if (uncertain) {
+    message = (exitCode === 124 || exitCode === 137 ? "Request timed out" : "Connection lost or command interrupted")
+      + "; the operation may have completed remotely. Refresh and check the VM inventory before retrying, especially before making another copy.";
+  }
+  if (detail) message += (message ? "\n" : "") + String(detail);
+  return {uncertain: uncertain, message: (message || "exe.dev command failed (exit " + exitCode + ").").slice(0, 500)};
+}
+
+function managementCommand(vm, action) {
+  if (["restart", "pause", "resume", "copy"].indexOf(action) < 0)
+    throw new Error("Unsupported VM action");
+  if (!vm || vm.adminAllowed !== true) throw new Error("VM administration is not allowed");
+  var safe = normalizeVm({vm_name: vm.name});
+  return ["timeout", "--kill-after=2s", "120s", "ssh",
+    "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes",
+    "-o", "ConnectTimeout=8", "-o", "ConnectionAttempts=1",
+    "-o", "ServerAliveInterval=5", "-o", "ServerAliveCountMax=2",
+    "exe.dev", action === "copy" ? "cp" : action, safe.name, "--json"];
+}
+
+function replCommand() {
+  // Omarchy floats this app-id. xdg-terminal-exec adapts it to the user's
+  // configured terminal; no transient Hyprland rule or shell wrapper needed.
+  return ["omarchy-launch-terminal", "--app-id=org.omarchy.terminal",
+    "--title=exe.dev", "ssh", "exe.dev"];
 }
 
 function browserCommand(vm) {
