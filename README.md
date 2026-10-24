@@ -7,6 +7,11 @@ Omarchy bar. Open a VM in your browser or SSH into it without leaving the deskto
 
 An independent community plugin, not an official exe.dev or Omarchy product.
 
+![exe.dev VM list and details with fictional demo data](preview.png)
+
+*Preview rendered from the native QML components with fictional VM names and
+metadata. No live account data is shown.*
+
 ## Features
 
 - Lists VMs grouped by their first tag, sorted by name within each group.
