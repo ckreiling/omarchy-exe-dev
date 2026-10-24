@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "id": "cmk.exe-dev",
+  "name": "exe.dev VMs",
+  "version": "1.0.0",
+  "author": "cmk",
+  "license": "MIT",
+  "description": "Browse exe.dev VMs from the Omarchy bar, with one-click SSH and web access.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Widget.qml"
+  },
+  "barWidget": {
+    "displayName": "exe.dev",
+    "category": "Network",
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "refreshIntervalSec": 60
+    },
+    "schema": [
+      {
+        "key": "refreshIntervalSec",
+        "type": "integer",
+        "label": "Refresh while open (seconds)",
+        "min": 15,
+        "max": 3600,
+        "step": 15,
+        "defaultValue": 60
+      }
+    ]
+  }
+}
