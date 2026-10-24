@@ -283,6 +283,8 @@ Column {
     width: parent.width
     spacing: Style.space(8)
     Keys.onPressed: function(event) {
+      // Opening a prompt must require a new deliberate press, not held Enter.
+      if (event.isAutoRepeat) { event.accepted = true; return }
       if (event.key === Qt.Key_Escape) {
         event.accepted = true
         root.cancelPending()

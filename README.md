@@ -120,8 +120,10 @@ Copy uses exe.dev's auto-generated name and consumes additional VM capacity.
 Restart interrupts running work and connections; pause suspends the VM until
 resumed. Commands run in the background, display their outcome, and refresh the
 list afterward. Only one management command runs at a time. Requests have a
-120-second deadline; a timeout can leave the outcome unknown, so refresh and
-check the account before retrying, especially before making another copy.
+120-second deadline. Timeouts or SSH disconnects can leave the outcome unknown:
+management stays disabled until a subsequent inventory refresh succeeds. Check
+the refreshed inventory before retrying, especially before making another copy.
+Confirmation ignores held-key repeats and requires a fresh Enter press.
 
 On the main list, **E** opens a new floating terminal running `ssh exe.dev`.
 It does not act on the selected VM. While typing a filter, E is ordinary text.

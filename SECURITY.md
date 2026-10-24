@@ -37,8 +37,10 @@ The plugin:
   validated before remote SSH command serialization. Copy creates a VM and may
   consume additional capacity; restart/pause can interrupt running work.
 - Serializes management requests and bounds them to 120 seconds plus a 2-second
-  forced-termination grace period. A timeout does not prove the remote operation
-  failed: refresh before retrying, particularly before copying.
+  forced-termination grace period. A timeout or SSH disconnect does not prove
+  the remote operation failed: management remains disabled until an inventory
+  query started afterward succeeds. Check that inventory before retrying,
+  particularly before copying. Confirmation rejects held-key autorepeat.
 - Opens the lobby REPL on E using a new terminal with Omarchy's stock floating
   app-id. Commands typed by the user in that REPL are outside the plugin's
   allowlist and confirmation UI.

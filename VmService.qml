@@ -12,7 +12,9 @@ Item {
   property bool refreshPending: false
   readonly property bool busy: listProcess.running
   readonly property var rows: Model.groupedRows(vms)
-  readonly property bool managementBusy: managementProcess.running
+  property bool managementAwaitingRefresh: false
+  property bool listReconcilesManagement: false
+  readonly property bool managementBusy: managementProcess.running || managementAwaitingRefresh
   property string managementVmName: ""
   property string managementAction: ""
   property string managementMessage: ""
@@ -21,11 +23,13 @@ Item {
   function refresh() {
     if (listProcess.running) { refreshPending = true; return }
     refreshPending = false
+    // Only a query started after an uncertain command can reconcile its outcome.
+    listReconcilesManagement = managementAwaitingRefresh
     listProcess.running = true
   }
 
   function manage(vmName, action) {
-    if (managementProcess.running) return
+    if (managementBusy) return
     // Look up the latest record: never act on an old detail-view snapshot.
     var vm = null
     for (var i = 0; i < vms.length; i++) {
@@ -81,6 +85,7 @@ Item {
     stderr: StdioCollector { id: errors; waitForEnd: true }
     onExited: function(exitCode) {
       root.readList(exitCode)
+      if (root.listReconcilesManagement && root.lastError === "") root.managementAwaitingRefresh = false
       if (root.refreshPending) Qt.callLater(root.refresh)
     }
   }
@@ -91,10 +96,10 @@ Item {
     stderr: StdioCollector { id: managementErrors; waitForEnd: true }
     onExited: function(exitCode) {
       root.managementError = exitCode !== 0
-      if (exitCode === 124 || exitCode === 137) {
-        root.managementMessage = "Request timed out; its outcome may be unknown. Refresh before retrying."
-      } else if (exitCode !== 0) {
-        root.managementMessage = (managementErrors.text.trim() || managementOutput.text.trim() || "exe.dev command failed (exit " + exitCode + ").").slice(0, 500)
+      if (exitCode !== 0) {
+        var failure = Model.managementFailure(exitCode, managementErrors.text.trim() || managementOutput.text.trim())
+        root.managementMessage = failure.message
+        root.managementAwaitingRefresh = failure.uncertain
       } else {
         root.managementMessage = root.managementAction === "copy" ? "Copy created. Refreshing machines…"
           : root.managementAction === "pause" ? "VM paused."

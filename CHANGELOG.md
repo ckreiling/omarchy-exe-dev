@@ -2,7 +2,7 @@
 
 ## 1.0.0
 
-Initial release (in preparation).
+Initial public release.
 
 - Compact VM details on Enter, with a shared hostname, resource summary, metadata
   grid, and browser/SSH buttons; no duplicate SSH/web address blocks.

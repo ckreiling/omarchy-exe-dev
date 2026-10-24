@@ -192,6 +192,17 @@ function sshCommand(vm) {
 
 // Fixed command/host and validated arguments only: SSH joins remote arguments
 // into a command string, so never pass arbitrary metadata or an arbitrary verb.
+function managementFailure(exitCode, detail) {
+  var uncertain = exitCode === 124 || exitCode >= 128 || exitCode < 0;
+  var message = "";
+  if (uncertain) {
+    message = (exitCode === 124 || exitCode === 137 ? "Request timed out" : "Connection lost or command interrupted")
+      + "; the operation may have completed remotely. Refresh and check the VM inventory before retrying, especially before making another copy.";
+  }
+  if (detail) message += (message ? "\n" : "") + String(detail);
+  return {uncertain: uncertain, message: (message || "exe.dev command failed (exit " + exitCode + ").").slice(0, 500)};
+}
+
 function managementCommand(vm, action) {
   if (["restart", "pause", "resume", "copy"].indexOf(action) < 0)
     throw new Error("Unsupported VM action");
