@@ -1,0 +1,19 @@
+# Local secrets and SSH material must never be committed.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+known_hosts*
+
+# Local/editor artifacts.
+.DS_Store
+*.swp
+*.swo
+*~
+*.log
+*.bak
+node_modules/
+coverage/

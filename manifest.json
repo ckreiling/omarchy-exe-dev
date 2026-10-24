@@ -3,9 +3,9 @@
   "id": "cmk.exe-dev",
   "name": "exe.dev VMs",
   "version": "1.0.0",
-  "author": "cmk",
+  "author": "Christian Kreiling",
   "license": "MIT",
-  "description": "Browse exe.dev VMs from the Omarchy bar, with one-click SSH and web access.",
+  "description": "Fuzzy-find exe.dev VMs from the Omarchy bar, with keyboard navigation, SSH, and browser access.",
   "kinds": [
     "bar-widget"
   ],
