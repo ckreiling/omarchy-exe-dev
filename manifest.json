@@ -18,9 +18,18 @@
     "allowMultiple": false,
     "defaultSection": "right",
     "defaults": {
-      "refreshIntervalSec": 60
+      "refreshIntervalSec": 60,
+      "clickAction": "ssh"
     },
     "schema": [
+      {
+        "key": "clickAction",
+        "type": "enum",
+        "label": "Click a VM to open",
+        "options": ["ssh", "browser", "details"],
+        "defaultValue": "ssh",
+        "description": "Mouse click action. Enter always opens VM details from the list; B and S always launch browser and SSH."
+      },
       {
         "key": "refreshIntervalSec",
         "type": "integer",

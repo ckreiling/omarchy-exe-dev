@@ -10,7 +10,7 @@ There are no npm dependencies or build step. Use Node.js 22 or newer:
 ```sh
 node --test tests/*.test.cjs
 omarchy plugin validate .
-qmllint -I "$OMARCHY_PATH/shell" Widget.qml VmService.qml
+qmllint -I "$OMARCHY_PATH/shell" Widget.qml VmService.qml VmNavigation.qml VmDetail.qml ShortcutHint.qml
 git diff --check
 ```
 
@@ -35,7 +35,21 @@ On a supported Omarchy session, test:
   letters does not activate them; Enter returns to the list without launching.
 - Arrow navigation, scrolling, browser/SSH selection, and hover selection
   target the same displayed VM, including after a refresh or filter change.
-- Both launch actions, access-disabled buttons, refresh, and middle-click.
+- S/B launch from both list and details; list Enter opens details; details Enter
+  launches the selected action. Escape returns to the same query and selection.
+- Row click defaults to SSH; test browser/details click settings, including
+  access-denied actions. There must be no action buttons on list rows.
+- Detail refresh tracks the same VM by name; removal returns to the list safely.
+- SSH/browser buttons, access-disabled buttons, refresh, and middle-click.
+- Creation age boundaries (just now/minutes/hours/days), live age updates, and
+  missing/invalid timestamps; the exact date should only appear on hover.
+- E opens a new floating terminal in the exe.dev REPL from the list, including
+  an empty account. While filtering, E must type normally.
+- Management actions require explicit admin access and named confirmation.
+  Escape cancels; Enter confirms once; no S/B shortcut may bypass confirmation.
+  Check success/error/timeout messages and the refreshed list afterward.
+  Exercise restart, pause/resume, and copy only on a disposable VM with the
+  account owner's permission; copy can consume additional capacity.
 - Empty account, failed authentication, unavailable network, malformed response,
   and recovery; stale results remain visible after a failed refresh.
 - Disable/re-enable, Git-based update, and removal. Do not remove a checkout

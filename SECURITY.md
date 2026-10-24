@@ -31,8 +31,20 @@ The plugin:
 - Uses argument arrays and an SSH option terminator instead of shell-evaluated
   VM metadata; it never evaluates the API's `ssh_command`.
 - Renders API-provided metadata as plain text.
+- Offers restart, pause/resume, and copy only after a confirmation naming the
+  target VM, and only when the latest API record explicitly grants admin access.
+  These commands use the fixed exe.dev host and allowlisted verbs; names are
+  validated before remote SSH command serialization. Copy creates a VM and may
+  consume additional capacity; restart/pause can interrupt running work.
+- Serializes management requests and bounds them to 120 seconds plus a 2-second
+  forced-termination grace period. A timeout does not prove the remote operation
+  failed: refresh before retrying, particularly before copying.
+- Opens the lobby REPL on E using a new terminal with Omarchy's stock floating
+  app-id. Commands typed by the user in that REPL are outside the plugin's
+  allowlist and confirmation UI.
 - Does not install packages, request elevated privileges, or change SSH config,
-  keys, known-hosts entries, VM lifecycle, access, or sharing settings.
+  keys, known-hosts entries, VM access, or sharing settings. No delete action is
+  exposed.
 
 Opening SSH intentionally gives you an interactive session on the selected VM.
 Opening a website exposes the browser to that VM's content. SSH forwarding,

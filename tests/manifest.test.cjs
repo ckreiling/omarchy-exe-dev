@@ -30,7 +30,13 @@ test('manifest declares a complete, installable bar widget', () => {
   const widget = read(manifest.entryPoints.barWidget);
   assert.ok(widget.includes('moduleName: "' + manifest.id + '"'));
   assert.ok(widget.includes('ipcTarget: "' + manifest.id + '"'));
-  assert.ok(widget.includes('Model.listRows(filteredVms, filterField.text)'));
+  assert.ok(widget.includes('VmNavigation {'));
+  assert.ok(read('VmNavigation.qml').includes('Model.listRows(filteredVms, query)'));
+  assert.equal(manifest.barWidget.defaults.clickAction, 'ssh');
+  const clickSetting = manifest.barWidget.schema.find(field => field.key === 'clickAction');
+  assert.equal(clickSetting.type, 'enum');
+  assert.deepEqual(clickSetting.options, ['ssh', 'browser', 'details']);
+  assert.equal(clickSetting.defaultValue, 'ssh');
 });
 
 test('plugin tree contains no symlinks outside Git internals', () => {
