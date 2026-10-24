@@ -28,6 +28,9 @@ test('management transport failures retain unknown-outcome and copy retry guidan
   assert.equal(rejected.uncertain, false);
   assert.equal(rejected.message, 'Permission denied');
   assert.ok(model.managementFailure(255, 'x'.repeat(1000)).message.length <= 500);
+  for (const signal of [0, 9, 15]) {
+    assert.equal(model.managementFailure(signal, '', 1).uncertain, true);
+  }
 });
 
 test('QML confirmation ignores autorepeat and accepts a fresh deliberate keypress', () => {
@@ -55,7 +58,7 @@ test('an in-flight stale inventory cannot unlock an uncertain management outcome
   const root = {
     managementAwaitingRefresh: true, listReconcilesManagement: false,
     refreshPending: false, lastError: '',
-    readList(code) { this.lastError = code === 0 ? '' : 'failed'; },
+    readList(code, status) { this.lastError = code === 0 && status === 0 ? '' : 'failed'; },
   };
   const listProcess = {running: true};
   const context = {root, listProcess, Qt: {callLater(fn) { queued.push(fn); }}};
@@ -64,24 +67,68 @@ test('an in-flight stale inventory cannot unlock an uncertain management outcome
     Object.defineProperty(context, key, {get() { return root[key]; }, set(value) { root[key] = value; }});
   }
   root.refresh = handler(text, /function refresh\(\) \{([\s\S]*?)\n  \}/, context);
-  const exitedMatch = text.match(/id: listProcess[\s\S]*?onExited: function\(exitCode\) \{([\s\S]*?)\n    \}/);
+  const exitedMatch = text.match(/id: listProcess[\s\S]*?onExited: function\(exitCode, exitStatus\) \{([\s\S]*?)\n    \}/);
   assert.ok(exitedMatch);
-  const exited = vm.runInNewContext('(function(exitCode) {' + exitedMatch[1] + '\n})', context);
+  const exited = vm.runInNewContext('(function(exitCode, exitStatus) {' + exitedMatch[1] + '\n})', context);
   root.refresh();
   assert.equal(root.refreshPending, true);
   assert.equal(root.listReconcilesManagement, false);
   listProcess.running = false;
-  exited(0); // Earlier request succeeds, but it predates the uncertain command.
+  exited(0, 0); // Earlier request succeeds, but it predates the uncertain command.
   assert.equal(root.managementAwaitingRefresh, true);
   queued.shift()(); // The coalesced request starts after the command.
   assert.equal(root.listReconcilesManagement, true);
   listProcess.running = false;
-  exited(1); // A failed reconciliation must not unlock management.
+  exited(1, 0); // A failed reconciliation must not unlock management.
   assert.equal(root.managementAwaitingRefresh, true);
   root.refresh();
   listProcess.running = false;
-  exited(0);
+  exited(0, 1); // Even exit code zero cannot reconcile a crashed query.
+  assert.equal(root.managementAwaitingRefresh, true);
+  root.refresh();
+  listProcess.running = false;
+  exited(0, 0);
   assert.equal(root.managementAwaitingRefresh, false);
   assert.match(text, /readonly property bool managementBusy: managementProcess\.running \|\| managementAwaitingRefresh/);
   assert.match(text, /function manage\(vmName, action\) \{\s*if \(managementBusy\) return/);
+});
+
+test('actual management exit handler treats raw Qt CrashExit signals as uncertain', () => {
+  const match = source('VmService.qml').match(/id: managementProcess[\s\S]*?onExited: function\(exitCode, exitStatus\) \{([\s\S]*?)\n    \}/);
+  assert.ok(match);
+  const queued = [];
+  const root = {managementAction: 'copy', refresh() {}};
+  const exited = vm.runInNewContext('(function(exitCode, exitStatus) {' + match[1] + '\n})', {
+    root, Model: model,
+    managementErrors: {text: ''}, managementOutput: {text: ''},
+    Qt: {callLater(fn) { queued.push(fn); }},
+  });
+  for (const code of [0, 9, 15]) {
+    root.managementAwaitingRefresh = false;
+    exited(code, 1); // QProcess::CrashExit, including raw SIGKILL (9).
+    assert.equal(root.managementError, true);
+    assert.equal(root.managementAwaitingRefresh, true);
+    assert.match(root.managementMessage, /may have completed remotely/);
+    assert.match(root.managementMessage, /another copy/);
+  }
+  assert.equal(queued.length, 3);
+  root.managementAwaitingRefresh = false;
+  exited(0, 0); // A normal successful copy must not be reported as a crash.
+  assert.equal(root.managementError, false);
+  assert.equal(root.managementAwaitingRefresh, false);
+  assert.match(root.managementMessage, /Copy created/);
+});
+
+test('actual inventory reader rejects CrashExit even with code zero and valid JSON', () => {
+  const match = source('VmService.qml').match(/function readList\(exitCode, exitStatus\) \{([\s\S]*?)\n  \}/);
+  assert.ok(match);
+  const previous = [{name: 'previous'}];
+  const context = {
+    vms: previous, lastError: '', errors: {text: ''}, output: {text: '{"vms":[]}'},
+    Model: model, Qt: {formatTime() { return '12:00:00'; }},
+  };
+  const read = vm.runInNewContext('(function(exitCode, exitStatus) {' + match[1] + '\n})', context);
+  read(0, 1);
+  assert.notEqual(context.lastError, '');
+  assert.equal(context.vms, previous);
 });

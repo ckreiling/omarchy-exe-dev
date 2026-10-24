@@ -192,8 +192,11 @@ function sshCommand(vm) {
 
 // Fixed command/host and validated arguments only: SSH joins remote arguments
 // into a command string, so never pass arbitrary metadata or an arbitrary verb.
-function managementFailure(exitCode, detail) {
-  var uncertain = exitCode === 124 || exitCode >= 128 || exitCode < 0;
+function managementFailure(exitCode, detail, exitStatus) {
+  // QProcess::NormalExit is 0; CrashExit carries the raw signal number as
+  // exitCode, not necessarily the shell-style 128 + signal encoding.
+  var crashed = exitStatus !== undefined && exitStatus !== 0;
+  var uncertain = crashed || exitCode === 124 || exitCode >= 128 || exitCode < 0;
   var message = "";
   if (uncertain) {
     message = (exitCode === 124 || exitCode === 137 ? "Request timed out" : "Connection lost or command interrupted")

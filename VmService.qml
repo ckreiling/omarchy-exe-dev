@@ -48,8 +48,8 @@ Item {
     }
   }
 
-  function readList(exitCode) {
-    if (exitCode !== 0) {
+  function readList(exitCode, exitStatus) {
+    if (exitCode !== 0 || exitStatus !== 0) {
       lastError = exitCode === 124 || exitCode === 137
         ? "exe.dev timed out. Check your connection and retry."
         : (errors.text.trim() || output.text.trim() || "Could not list VMs (exit " + exitCode + ").")
@@ -83,8 +83,8 @@ Item {
               "exe.dev", "ls", "--json"]
     stdout: StdioCollector { id: output; waitForEnd: true }
     stderr: StdioCollector { id: errors; waitForEnd: true }
-    onExited: function(exitCode) {
-      root.readList(exitCode)
+    onExited: function(exitCode, exitStatus) {
+      root.readList(exitCode, exitStatus)
       if (root.listReconcilesManagement && root.lastError === "") root.managementAwaitingRefresh = false
       if (root.refreshPending) Qt.callLater(root.refresh)
     }
@@ -94,10 +94,10 @@ Item {
     id: managementProcess
     stdout: StdioCollector { id: managementOutput; waitForEnd: true }
     stderr: StdioCollector { id: managementErrors; waitForEnd: true }
-    onExited: function(exitCode) {
-      root.managementError = exitCode !== 0
-      if (exitCode !== 0) {
-        var failure = Model.managementFailure(exitCode, managementErrors.text.trim() || managementOutput.text.trim())
+    onExited: function(exitCode, exitStatus) {
+      root.managementError = exitCode !== 0 || exitStatus !== 0
+      if (root.managementError) {
+        var failure = Model.managementFailure(exitCode, managementErrors.text.trim() || managementOutput.text.trim(), exitStatus)
         root.managementMessage = failure.message
         root.managementAwaitingRefresh = failure.uncertain
       } else {
